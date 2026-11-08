@@ -1,0 +1,43 @@
+name: Build DomainSniffer
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: brew install ldid dpkg make
+
+      - name: Install Theos
+        run: |
+          git clone --recursive --depth=1 https://github.com/theos/theos.git "$HOME/theos"
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Install iOS SDK
+        run: |
+          git clone --depth=1 https://github.com/theos/sdks.git /tmp/sdks
+          mv /tmp/sdks/*.sdk "$HOME/theos/sdks/"
+
+      - name: Build
+        working-directory: DomainSniffer
+        run: |
+          export PATH="$(brew --prefix make)/libexec/gnubin:$PATH"
+          make package FINALPACKAGE=1
+
+      - name: Collect output
+        run: |
+          mkdir -p out
+          cp DomainSniffer/packages/*.deb out/
+          find DomainSniffer/.theos/obj -name "DomainSniffer.dylib" -exec cp {} out/ \;
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: DomainSniffer
+          path: out/*
